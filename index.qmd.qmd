@@ -1,0 +1,144 @@
+---
+title: "Diseño"
+author: "joel"
+format: html
+---
+
+# Análisis e diseño experimental
+
+## Base de datos
+
+> https://docs.google.com/spreadsheets/d/1naJydTlyI7aFkVTrEddpH1fgKKoK82Y7bbGmx6JwYCA/edit?gid=1940741926#gid=1940741926
+
+## Identificar los factores
+
+1. Factor 1: Boro (B)
+2. Factor 2: Potasio (K)
+
+## Identificar el modelo
+
+Factorial en DBCA
+# Diseño experimental
+
+$$Y_{ij} = \mu + \tau_i + \beta_j + \varepsilon_{ij}$$
+
+
+# Project setup
+
+```{r}
+#| label: setup
+
+source('https://inkaverse.com/setup.r')
+```
+
+## Data import
+
+```{r}
+
+library(googlesheets4)
+
+# Enlace de nuestro Google Sheets
+
+library(googlesheets4)
+library(dplyr)
+
+# Enlace de Google Sheets
+gs <- "https://docs.google.com/spreadsheets/d/1naJydTlyI7aFkVTrEddpH1fgKKoK82Y7bbGmx6JwYCA/edit"
+
+# Importar datos originales
+datos <- read_sheet(gs, sheet = "fb")
+
+# Comprobar las 112 mediciones
+stopifnot(nrow(datos) == 112)
+
+# Calcular promedios por tratamiento y bloque
+fb <- datos %>%
+  group_by(trat, bloque, B, K) %>%
+  summarise(
+    adf = mean(adf),
+    ldf = mean(ldf),
+    pdf = mean(pdf),
+    ldc = mean(ldc),
+    brix = mean(brix),
+    .groups = "drop"
+  )
+
+# Convertir variables en factores
+fb$trat <- as.factor(fb$trat)
+fb$bloque <- as.factor(fb$bloque)
+
+# Verificar resultados
+head(fb)
+str(fb)
+nrow(fb)
+
+
+
+```
+# Analisis de varianza
+
+```{r}
+
+md <- aov(
+  brix ~ bloque + trat,
+  data = fb
+)
+
+anova(md)
+
+```
+
+# comparación de medias
+
+```{r}
+
+# Comparación de medias de grados Brix
+library(emmeans)
+
+# Calcular medias de los tratamientos
+mc <- emmeans(md, ~ trat)
+
+# Mostrar medias
+summary(mc)
+
+# Prueba de Tukey al 5 %
+comparacion <- pairs(mc, adjust = "tukey")
+
+# Mostrar resultados
+summary(comparacion)
+
+
+```
+
+# Representación gráfica
+
+```{r}
+library(ggplot2)
+library(emmeans)
+library(multcomp)
+
+# Medias ajustadas por tratamiento
+mc <- emmeans(md, ~ trat)
+
+# Letras de Tukey
+tab <- cld(mc, adjust = "tukey", Letters = letters)
+
+# Quitar espacios extras en las letras
+tab$.group <- gsub(" ", "", tab$.group)
+
+# Ver tabla para revisar
+tab
+
+# Gráfica
+ggplot(tab, aes(x = trat, y = emmean)) +
+  geom_col(fill = "lightgray", color = "black", width = 0.7) +
+  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE), width = 0.2) +
+  geom_text(aes(label = .group, y = emmean + SE + 0.15), size = 5) +
+  labs(
+    title = "Comparación de medias de grados Brix",
+    x = "Tratamientos",
+    y = "Grados Brix (°Bx)"
+  ) +
+  theme_minimal()
+
+```
